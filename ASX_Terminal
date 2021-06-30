@@ -1,0 +1,436 @@
+
+#sampledata.csv
+
+import json
+import csv
+import operator
+import matplotlib.pyplot as plt
+import datetime as dt
+import pandas as pd
+import numpy as np
+
+
+
+MAIN_MENU_OPTION_TEXT =  '''
+ Please choose from the options below
+ 1. Load data from a file
+ 2. View Data
+ 3. Clean Data
+ 4. Analyse Data
+ 5. Visualise Data
+ 6. Save Data to a file
+ 7. Quit
+ '''
+
+SUB_MENU_CLEAN_OPTION_TEXT =  '''
+ Please select from the below cleaning options, or leave blank to exit:
+    1 - Drop rows with missing values 
+    2 - Fill missing values 
+    3 - Drop duplicate rows 
+    4 - Drop column 
+    5 - Rename column 
+    6 - Finish cleaning   
+'''    
+    
+
+
+    
+def main():
+    print("Welcome to the DataFrame Statistician")
+    print(" Programmed by Jarman Giffard ")
+    print("")
+
+    extract_csv = []
+    response = validate_response()
+    
+    
+    while response != 7:
+        
+        if response == 1:
+            import_df = opt_load_data()
+
+        elif response == 2:
+            try:
+                opt_view_data(import_df)
+            except UnboundLocalError:
+                print("Error: data has not yet been imported, please complete step 1 then retry")
+
+        elif response == 3:
+            try:
+                import_df = opt_clean_data(import_df)
+            except UnboundLocalError:
+                print("Error: data has not yet been imported, please complete step 1 then retry")
+
+        elif response == 4:
+            try:
+                analyse_data(import_df)
+            except UnboundLocalError:
+                print("ERROR: Missing data. Please ensure step 2 has been entered, plus 1 and/or 3")
+
+        elif response == 5:
+            try:
+                visualise_data(import_df)
+            except UnboundLocalError:
+                print("ERROR: Missing data. Please ensure step 2 has been entered, plus 1 and/or 3")
+            
+        elif response == 6:
+            try:
+                save_data(import_df)
+            except UnboundLocalError:
+                print("ERROR: Data has not yet been imported, please option 1 and/or 3 to insert data")
+
+        response = validate_response()
+        
+    print("Farewell")
+        
+        
+
+        
+
+# --- --- --- --- --- ---
+# Section 1: Load data
+# --- --- --- --- --- ---
+
+def opt_load_data():
+
+    csv_filename = file_import_validate()
+
+    import_check = False
+    while not import_check:
+        try:
+            imported_csv_df = pd.read_csv(csv_filename)
+            import_check = True
+        except FileNotFoundError:
+            print("File not found")
+            csv_filename = file_import_validate()
+            
+
+    n_imported_csv_df = len(imported_csv_df)
+    print(imported_csv_df)
+    print(f"{n_imported_csv_df} records were successfully loaded")
+
+    prompt_index = input("Please enter the column name to use as index, or leave blank for default: ")
+    
+    while prompt_index != '':  # set the index, return dataframe
+        try:
+            imported_csv_df.set_index(prompt_index, inplace=True)
+            print("Set column '",prompt_index,"' as index")
+            return imported_csv_df
+        except KeyError:
+            prompt_index = input("Invalid column, please enter another or leave blank to use default")  
+            
+    else:                   # index = default, return dataframe
+        return imported_csv_df
+
+# --- --- --- --- --- ---
+# Section 1a: Load data (validate)
+# --- --- --- --- --- ---    
+def file_import_validate():
+    csv_filename = input("Please enter the filename of the CSV to load: ")
+    csv_last_4_chars = csv_filename[-4:].upper().strip()
+
+    while csv_last_4_chars != ".CSV":
+        print("Invalid filetype, must be .csv")
+        csv_filename = input("Please enter the filename of the CSV to load: ")
+        csv_last_4_chars = csv_filename[-4:].upper().strip()
+        
+    return csv_filename
+    
+    
+    
+# --- --- --- --- --- ---
+# Section 2: view data
+# --- --- --- --- --- ---       
+def opt_view_data(dataframe_to_view):
+    print("\n","Printing data...","\n")
+    print(dataframe_to_view)
+
+
+# --- --- --- --- --- ---
+# Section 3: clean data
+# --- --- --- --- --- ---     
+def opt_clean_data(data_to_clean):
+
+    clean_prompt_response = input(SUB_MENU_CLEAN_OPTION_TEXT)
+        
+    while clean_prompt_response != '':
+        
+        if clean_prompt_response == '1':   # Drop rows with missing values
+            import_df = clean_drop_missing(data_to_clean)
+            
+        elif clean_prompt_response == '2': # Fill missing values
+            import_df = clean_fill_missing_values(data_to_clean)
+            
+        elif clean_prompt_response == '3': # Drop duplicate rows
+            import_df = clean_drop_duplicate_rows(data_to_clean)
+            
+        elif clean_prompt_response == '4': # Drop column
+            print(data_to_clean)
+            import_df = clean_drop_column(data_to_clean)
+            
+        elif clean_prompt_response == '5': # Rename column
+            import_df = clean_rename_column(data_to_clean)    
+            
+        elif clean_prompt_response == '6': # Finish cleaning
+            print("Exiting") 
+            return import_df
+        
+        else:
+            print("Invalid selection entered")
+            
+        clean_prompt_response = input(SUB_MENU_CLEAN_OPTION_TEXT)
+        
+    return import_df
+
+
+# --- --- --- --- --- ---
+# Section 3a: niche clean functions 
+# --- --- --- --- --- ---          
+
+# Drop rows with missing values
+def clean_drop_missing(data_to_use):
+
+    print(data_to_use)
+    prompt_thresh = input("Please enter a number.     Rows with total missing values LESS THAN the number you enter will be dropped: ").strip()
+    current_length = len(data_to_use)
+    if prompt_thresh != '':
+        try:
+            prompt_thresh = int(prompt_thresh)
+            data_to_use.dropna(thresh=prompt_thresh, inplace=True)
+            new_length = len(data_to_use)
+            records_dropped = int(current_length) - int(new_length)
+            print(f"Deletion complete; {records_dropped} records were dropped")
+            return data_to_use
+        except ValueError:
+            prompt_thresh = input("Please enter a number.            Rows with total missing values LESS THAN the number you enter will be dropped: ").strip()
+
+    
+    
+# Fill missing values
+def clean_fill_missing_values(data_to_use):
+    
+    missing_values = int(data_to_use.isnull().sum().sum())
+    if missing_values < 1:
+        print("There are no missing values - returning to previous menu...")
+        return data_to_use
+    else:
+        print(f"There are {missing_values} missing values.")
+        replace_missing_prompt = input("What would you like to replace these missing values with?").strip()
+        
+        valid_int_input = False
+        while not valid_int_input:
+            try:
+                replace_missing_prompt = int(replace_missing_prompt)
+                valid_int_input = True
+            except:
+                replace_missing_prompt = input("Invalid integer entered. Please enter a whole number: ")
+     
+        data_to_use.fillna(replace_missing_prompt, inplace=True)
+
+        return data_to_use
+
+    
+    
+# Drop duplicate rows
+def clean_drop_duplicate_rows(data_to_use):
+    confirm_delete_dup = input("Delete duplicate rows? Y/N: ").upper()
+    
+    while confirm_delete_dup != "N" and confirm_delete_dup != "Y":
+        confirm_delete_dup = input("Invalid choice, please enter [Y]es or [N]o :")
+    
+    if confirm_delete_dup == "Y":
+        current_length = len(data_to_use)
+        data_to_use.drop_duplicates(inplace=True)
+        new_length = len(data_to_use)
+        records_dropped = int(current_length) - int(new_length)
+        print(f"Deletion complete; {records_dropped} records were dropped")
+        return data_to_use
+    else:
+        return data_to_use
+    
+        
+# Drop column
+def clean_drop_column(data_to_use):
+    existing_column_names = []    
+
+    print("Please select which column you would like to drop: ")
+    for col in data_to_use.columns:
+        existing_column_names.append(col) 
+        print(col)
+    prompt_drop_column = input()
+    
+    while prompt_drop_column != '':
+        if prompt_drop_column in existing_column_names:
+            print("Dropping column:  ",prompt_drop_column)
+            data_to_use.drop([prompt_drop_column], axis = 1, inplace=True)
+            print(data_to_use)
+            return data_to_use
+        else:
+            print("Invalid column name specified")
+            prompt_drop_column = input("Please select which column you would like to drop: ")
+     
+
+    
+def validate_col_name(column_name, existing_cols, old_col):
+    illegal_char_list = '\/:*?"<>|/" ' 
+    starting_char = column_name[0]
+    
+    if old_col:
+        while starting_char.isdigit()         or starting_char in illegal_char_list         or column_name not in existing_cols:  # check if column exists already
+            column_name = input("Invalid name selected, please try another: ")
+            starting_char = column_name[0]
+        print("Valid name ")
+        return column_name
+    
+    elif not old_col:
+        while starting_char.isdigit()         or starting_char in illegal_char_list         or column_name in existing_cols:      # ensure column DOESN'T exist already
+            column_name = input("Invalid rename selected, please enter a valid variable: ")
+            starting_char = column_name[0]
+        return column_name  
+    #return column_name
+    
+    
+# Rename column
+def clean_rename_column(data_to_use):
+    illegal_char_list = '\/:*?"<>|/" ' 
+    existing_column_names = []
+    
+    for col in data_to_use.columns:
+        existing_column_names.append(col)
+        print(col)
+    print() # line break
+    
+    prompt_current_rename = input("Please select which column you would like to rename: ")
+    prompt_current_rename = validate_col_name(prompt_current_rename, existing_column_names, True)
+    
+
+    prompt_new_name = input(f"What would you like to rename {prompt_current_rename} to? ")
+    prompt_new_name = validate_col_name(prompt_new_name, existing_column_names, False)
+    
+  
+    data_to_use.rename(columns={prompt_current_rename:prompt_new_name}, inplace=True)
+    return data_to_use            
+            
+       
+
+# --- --- --- --- --- ---
+# Section 4: analyse data 
+# --- --- --- --- --- ---  
+def analyse_data(data_to_use):
+    count_print_string = "number of values (n)"
+    min_print_string = "minimum"
+    max_print_string = "maximum"
+    mean_print_string = "mean"
+    median_print_string = "median"
+    std_print_string = "standard deviation"
+    sem_print_string = "std. err. of mean"
+
+    for column in data_to_use:
+        column_length = len(column)
+        print(f"{column}")
+        print("-" * column_length)
+        print(f"{count_print_string:>20}: {data_to_use[column].count():<10.0f}")
+        print(f"{min_print_string:>20}: {data_to_use[column].min():<10.2f}")
+        print(f"{max_print_string:>20}: {data_to_use[column].max():<10.2f}")
+        print(f"{mean_print_string:>20}: {data_to_use[column].mean():<10.2f}")
+        print(f"{median_print_string:>20}: {data_to_use[column].median():<10.2f}")
+        print(f"{std_print_string:>20}: {data_to_use[column].std():<10.2f}")
+        print(f"{sem_print_string:>20}: {data_to_use[column].sem():<10.2f}")
+        print()
+
+    print(data_to_use.corr())    
+    
+# --- --- --- --- --- ---
+# Section 5: visualise data 
+# --- --- --- --- --- ---    
+def visualise_data(data_to_use):
+
+    chart_list = ["bar", "box", "line"]
+    subplot_answers = ["y","n"]
+
+    chart_prompt = input("What type of chart would you like? Bar, Box, or Line: ").lower().strip()
+    while chart_prompt not in chart_list:
+        chart_prompt = input("Invalid selection, please select from: Bar, Box, or Line ").lower().strip()
+
+    subplot_prompt = input("Use subplots in output? [Y]es or [N]o? ").lower().strip()
+    while subplot_prompt not in subplot_answers:
+        subplot_prompt = input("Invalid selection. Please enter 'Y' or 'N': ").lower().strip()
+
+        
+    side_label = input("Enter the Y-axis (side) label: ")        
+    bottom_label = input("Enter the X-axis (bottom) label: ")    
+    plot_title = input("Enter the title of the plot: ")
+
+    if data_to_use.index.name is None:
+        index_check = False
+    else:
+        index_check = True    
+    
+    if subplot_prompt == "y":
+        subplot_check = True
+    else:
+        subplot_check = False
+
+    plt.close("all")
+    data_to_use.plot(kind=chart_prompt, use_index=index_check, subplots=subplot_check)
+    plt.ylabel(side_label)
+    plt.xlabel(bottom_label)
+    plt.suptitle(plot_title)
+    plt.tight_layout()
+    plt.show() 
+    
+    return
+    
+# --- END OF VISUALISATION ---
+
+# --- --- --- --- --- ---
+# Section 6: save data
+# --- --- --- --- --- ---    
+    
+def save_data(imported_df):
+    export_file = input("Enter the desired output filename including extension: ")
+
+    if export_file.strip() != '':
+        try:
+            imported_df.to_csv(export_file)
+            print("Data exporting, saved as: ", export_file)
+        except ValueError:
+            print("Invalid input, returning to main menu")         
+    else:
+        print("Save cancelled, returning to main menu")
+   
+    
+def validate_response():
+    
+    print(MAIN_MENU_OPTION_TEXT)
+    response = input("Enter your selection here: ")
+    
+    while not response.strip().isdigit():
+        print("Invalid option selected. Enter a number between 1 - 7 ")
+        response = input("Enter your selection here: ")
+    
+    try:
+        response = int(response)
+    except ValueError:
+        print("Invalid option selected. ")
+        response = input("Enter your selection here: ")
+        
+    
+    while response not in range(1,8):
+        print("Invalid choice")
+        response = int(input("Enter your selection here: "))
+    
+    return response    
+
+
+
+
+
+main()
+
+
+
+
+
+
+
